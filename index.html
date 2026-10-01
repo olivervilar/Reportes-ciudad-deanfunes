@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporte Ciudadano - Deán Funes</title>
+
+  <!-- Leaflet CSS for Map rendering -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root {
+      --primary: #2c3e50;
+      --accent: #27ae60;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #333333;
+      --shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    /* Header Navbar */
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary:hover {
+      background-color: #219150;
+      transform: translateY(-1px);
+    }
+
+    /* Main Content Layout */
+    .app-container {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map {
+      flex: 1;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Sidebar Issue Feed */
+    .sidebar {
+      width: 360px;
+      background: var(--card-bg);
+      border-left: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      z-index: 2;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.05);
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #eeeeee;
+      background-color: #ffffff;
+    }
+
+    .sidebar-header h2 {
+      font-size: 1.1rem;
+      color: var(--primary);
+    }
+
+    .issue-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .issue-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .issue-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .issue-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: white;
+    }
+
+    .severity-Alta { background-color: #e74c3c; }
+    .severity-Media { background-color: #f39c12; }
+    .severity-Baja { background-color: #3498db; }
+
+    .issue-card-title {
+      font-weight: bold;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .issue-card-desc {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .issue-card-footer {
+      font-size: 0.75rem;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+
+    }
+
+    .form-group input, 
+    .form-group select, 
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .camera-preview-container {
+      margin-top: 8px;
+      width: 100%;
+      height: 180px;
+      border: 2px dashed #ccc;
+      border-radius: 6px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-size: cover;
+      background-position: center;
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    /* Custom Leaflet Markers */
+    .custom-marker {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 18px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border: 2px solid white;
+    }
+
+    .marker-bache { background-color: #e74c3c; }      /* Red */
+    .marker-alumbrado { background-color: #f1c40f; }  /* Yellow */
+    .marker-basura { background-color: #2ecc71; }     /* Green */
+    .marker-agua { background-color: #3498db; }       /* Blue */
+    .marker-otros { background-color: #9b59b6; }      /* Purple */
+
+    /* Detail View Styling */
+    .detail-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .vote-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .btn-vote {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #f8f9fa;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.8rem;
+      transition: background 0.2s;
+    }
+
+    .btn-confirm:hover { background-color: #e8f8f5; border-color: #27ae60; color: #27ae60; }
+    .btn-resolve:hover { background-color: #fef9e7; border-color: #e67e22; color: #e67e22; }
+
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 40%;
+      }
+      #map {
+        height: 60%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📍 Deán Funes - Reportes</h1>
+    <button class="btn-primary" id="openReportModalBtn">
+      ➕ Nuevo Reporte
+    </button>
+  </header>
+
+  <div class="app-container">
+    <div id="map"></div>
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Incidencias Activas</h2>
+      </div>
+      <div class="issue-list" id="issueList">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modal: Report New Issue -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Reportar un Problema</h3>
+        <button class="modal-close" id="closeReportModalBtn">&times;</button>
+      </div>
+      <form id="issueForm">
+        <div class="form-group">
+          <label>Ubicación en el mapa</label>
+          <input type="text" id="locationInput" placeholder="Haz clic en el mapa para marcar la ubicación" readonly required>
+          <input type="hidden" id="latInput">
+          <input type="hidden" id="lngInput">
+        </div>
+
+        <div class="form-group">
+          <label for="issueType">Tipo de Problema</label>
+          <select id="issueType" required>
+            <option value="bache">🛣️ Bache / Calzada</option>
+            <option value="alumbrado">💡 Alumbrado Público</option>
+            <option value="basura">🗑️ Basura / Acumulación</option>
+            <option value="agua">💧 Fuga de Agua / Cloacas</option>
+            <option value="otros">⚠️ Otros</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="severity">Nivel de Gravedad</label>
+          <select id="severity" required>
+            <option value="Baja">Baja</option>
+            <option value="Media" selected>Media</option>
+            <option value="Alta">Alta</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Descripción breve</label>
+          <textarea id="description" rows="3" placeholder="Describe el problema en detalle..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Fotografía obligatoria (Cámara o Galería)</label>
+          <!-- Camera Capture trigger -->
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" required>
+          <div class="camera-preview-container" id="cameraPreview">
+            Sin imagen seleccionada
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center;">
+          Enviar Reporte
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Issue Detail View -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="detailTitle">Detalle de Incidencia</h3>
+        <button class="modal-close" id="closeDetailModalBtn">&times;</button>
+      </div>
+      <div id="detailContent">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Config: Initial Coordinates centered on Deán Funes, Córdoba, Argentina
+    const DEAN_FUNES_COORDS = [-30.4208, -64.3497];
+    
+    // Category mappings (Icon & Color styling)
+    const CATEGORIES = {
+      bache: { label: 'Bache / Calzada', symbol: '🛣️️', class: 'marker-bache' },
+      alumbrado: { label: 'Alumbrado Público', symbol: '💡', class: 'marker-alumbrado' },
+      basura: { label: 'Basura', symbol: '🗑️', class: 'marker-basura' },
+      agua: { label: 'Fuga de Agua', symbol: '💧', class: 'marker-agua' },
+      otros: { label: 'Otros', symbol: '⚠️', class: 'marker-otros' }
+    };
+
+    // State
+    let issues = [
+      {
+        id: 1,
+        type: 'bache',
+        severity: 'Alta',
+        description: 'Bache profundo cerca de la Plaza San Martín. Dificulta el paso vehicular.',
+        lat: -30.4215,
+        lng: -64.3502,
+        date: new Date(Date.now() - 3600000 * 4).toISOString(), // 4 hours ago
+        confirmations: 3,
+        goneReports: 0,
+        image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80'
+      },
+      {
+        id: 2,
+        type: 'alumbrado',
+        severity: 'Media',
+        description: 'Luminaria apagada sobre Calle España. Zona muy oscura por la noche.',
+        lat: -30.4192,
+        lng: -64.3475,
+        date: new Date(Date.now() - 3600000 * 18).toISOString(), // 18 hours ago
+        confirmations: 1,
+        goneReports: 0,
+        image: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=600&q=80'
+      }
+    ];
+
+    let map;
+    let markersMap = {};
+    let selectedLatLng = null;
+    let tempImageData = null;
+
+    // Initialize Map
+    function initMap() {
+      map = L.map('map').setView(DEAN_FUNES_COORDS, 15);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors | Deán Funes'
+      }).addTo(map);
+
+      // Handle map click to select location for new issue
+      map.on('click', (e) => {
+        selectedLatLng = e.latlng;
+        document.getElementById('latInput').value = e.latlng.lat;
+        document.getElementById('lngInput').value = e.latlng.lng;
+        document.getElementById('locationInput').value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+        openModal('reportModal');
+      });
+
+      refreshMapAndList();
+    }
+
+    // Refresh display applying validation rules (>24h without confirmation, resolution votes)
+    function refreshMapAndList() {
+      const now = new Date();
+
+      // Filter out stale or resolved issues
+      issues = issues.filter(issue => {
+        const createdDate = new Date(issue.date);
+        const hoursOld = (now - createdDate) / (1000 * 60 * 60);
+
+        // Rule 1: Disappears if > 24 hours old and has 0 confirmations
+        if (hoursOld > 24 && issue.confirmations === 0) {
+          return false;
+        }
+
+        // Rule 2: Removed if people reporting "gone" exceed confirmations
+        if (issue.goneReports > issue.confirmations) {
+          return false;
+        }
+
+        return true;
+      });
+
+      // Clear existing markers
+      Object.values(markersMap).forEach(marker => map.removeLayer(marker));
+      markersMap = {};
+
+      const listContainer = document.getElementById('issueList');
+      listContainer.innerHTML = '';
+
+      if (issues.length === 0) {
+        listContainer.innerHTML = '<p style="text-align:center; color:#888; margin-top:20px;">No hay reportes activos en Deán Funes.</p>';
+        return;
+      }
+
+      // Render Markers and Sidebar Cards
+      issues.forEach(issue => {
+        const cat = CATEGORIES[issue.type] || CATEGORIES.otros;
+
+        // Custom HTML Marker Icon
+        const customIcon = L.divIcon({
+          className: '',
+          html: `<div class="custom-marker ${cat.class}">${cat.symbol}</div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+
+        const marker = L.marker([issue.lat, issue.lng], { icon: customIcon }).addTo(map);
+        marker.on('click', () => openDetailModal(issue.id));
+        markersMap[issue.id] = marker;
+
+        // Create Sidebar Card
+        const card = document.createElement('div');
+        card.className = 'issue-card';
+        card.onclick = () => {
+          map.flyTo([issue.lat, issue.lng], 17);
+          openDetailModal(issue.id);
+        };
+
+        const dateStr = new Date(issue.date).toLocaleDateString('es-AR', {
+          hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short'
+        });
+
+        card.innerHTML = `
+          <div class="issue-card-header">
+            <span class="issue-card-title">${cat.symbol} ${cat.label}</span>
+            <span class="badge severity-${issue.severity}">${issue.severity}</span>
+          </div>
+          <p class="issue-card-desc">${escapeHtml(issue.description)}</p>
+          <div class="issue-card-footer">
+            <span>📅 ${dateStr}</span>
+            <span>👍 ${issue.confirmations} | 👎 ${issue.goneReports}</span>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+    }
+
+    // Modal Controls
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // Camera Image Handling
+    document.getElementById('cameraInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempImageData = evt.target.result;
+          const preview = document.getElementById('cameraPreview');
+          preview.style.backgroundImage = `url(${tempImageData})`;
+          preview.textContent = '';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Handle Form Submission
+    document.getElementById('issueForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      if (!tempImageData) {
+        alert('Es obligatorio adjuntar una fotografía del problema.');
+        return;
+      }
+
+      const lat = parseFloat(document.getElementById('latInput').value);
+      const lng = parseFloat(document.getElementById('lngInput').value);
+
+      if (isNaN(lat) || isNaN(lng)) {
+        alert('Por favor, selecciona una ubicación en el mapa.');
+        return;
+      }
+
+      const newIssue = {
+        id: Date.now(),
+        type: document.getElementById('issueType').value,
+        severity: document.getElementById('severity').value,
+        description: document.getElementById('description').value,
+        lat: lat,
+        lng: lng,
+        date: new Date().toISOString(),
+        confirmations: 1, // Automatic first confirmation by creator
+        goneReports: 0,
+        image: tempImageData
+      };
+
+      issues.unshift(newIssue);
+      refreshMapAndList();
+
+      // Reset & close
+      this.reset();
+      tempImageData = null;
+      document.getElementById('cameraPreview').style.backgroundImage = 'none';
+      document.getElementById('cameraPreview').textContent = 'Sin imagen seleccionada';
+      closeModal('reportModal');
+    });
+
+    // Detail Modal with Image View & Interactive Confirmations
+    function openDetailModal(issueId) {
+      const issue = issues.find(i => i.id === issueId);
+      if (!issue) return;
+
+      const cat = CATEGORIES[issue.type] || CATEGORIES.otros;
+      const dateFormatted = new Date(issue.date).toLocaleString('es-AR');
+
+      document.getElementById('detailTitle').innerText = `${cat.symbol} ${cat.label}`;
+      
+      const content = document.getElementById('detailContent');
+      content.innerHTML = `
+        <img src="${issue.image}" class="detail-img" alt="Foto de la incidencia">
+        <p><strong>Gravedad:</strong> <span class="badge severity-${issue.severity}">${issue.severity}</span></p>
+        <p style="margin-top:8px;"><strong>Fecha:</strong> ${dateFormatted}</p>
+        <p style="margin-top:8px;"><strong>Descripción:</strong></p>
+        <p style="color:#555; font-size:0.9rem; margin-top:4px;">${escapeHtml(issue.description)}</p>
+        
+        <div style="margin-top:12px; font-size:0.85rem; color:#666;">
+          <strong>Estado actual:</strong> ${issue.confirmations} confirmaciones / ${issue.goneReports} reportes de solución
+        </div>
+
+        <div class="vote-actions">
+          <button class="btn-vote btn-confirm" onclick="voteIssue(${issue.id}, 'confirm')">
+            👍 Confirmar que persiste
+          </button>
+          <button class="btn-vote btn-resolve" onclick="voteIssue(${issue.id}, 'resolve')">
+            👎 Reportar que ya no está
+          </button>
+        </div>
+      `;
+
+      openModal('detailModal');
+    }
+
+    // Voting Actions Logic
+    window.voteIssue = function(id, action) {
+      const issue = issues.find(i => i.id === id);
+      if (!issue) return;
+
+      if (action === 'confirm') {
+        issue.confirmations += 1;
+      } else if (action === 'resolve') {
+        issue.goneReports += 1;
+      }
+
+      closeModal('detailModal');
+      refreshMapAndList();
+    };
+
+    // Helper Utility
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
+    // Event Listeners for UI
+    document.getElementById('openReportModalBtn').onclick = () => {
+      if (!selectedLatLng) {
+        selectedLatLng = { lat: DEAN_FUNES_COORDS[0], lng: DEAN_FUNES_COORDS[1] };
+        document.getElementById('latInput').value = selectedLatLng.lat;
+        document.getElementById('lngInput').value = selectedLatLng.lng;
+        document.getElementById('locationInput').value = `Deán Funes (Centro)`;
+      }
+      openModal('reportModal');
+    };
+
+    document.getElementById('closeReportModalBtn').onclick = () => closeModal('reportModal');
+    document.getElementById('closeDetailModalBtn').onclick = () => closeModal('detailModal');
+
+    // Start application on load
+    window.onload = initMap;
+  </script>
+</body>
+</html>
