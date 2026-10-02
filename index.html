@@ -469,7 +469,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
   <script>
-    // Configuración exacta ingresada por el usuario
     const firebaseConfig = {
       apiKey: "AIzaSyB9nLJ3QQCjfMI8l3jNkLPcEN1HIJShXkQ",
       authDomain: "reportes-deanfunes.firebaseapp.com",
@@ -484,7 +483,6 @@
     let database = null;
     let issuesRef = null;
 
-    // Inicialización a prueba de recargas de CodePen (Evita error 'duplicate-app')
     try {
       if (typeof firebase !== 'undefined') {
         if (!firebase.apps.length) {
@@ -566,9 +564,6 @@
           refreshMapAndList();
         }, (error) => {
           console.warn("Aviso de sincronización en Firebase:", error);
-          if (error && error.code === 'PERMISSION_DENIED') {
-            alert('⚠️ ATENCIÓN: Las Reglas de Realtime Database están bloqueadas.\n\nVe a tu Consola de Firebase -> Realtime Database -> Pestaña "Reglas" y cámbialas a:\n{\n  ".read": true,\n  ".write": true\n}');
-          }
           refreshMapAndList();
         });
       } else {
@@ -735,14 +730,19 @@
       };
 
       if (issuesRef) {
-        issuesRef.push(newIssue)
+        // Temporizador de emergencia de 5 segundos
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('TIMEOUT_FIREBASE')), 5000);
+        });
+
+        Promise.race([issuesRef.push(newIssue), timeoutPromise])
           .then(() => {
             finalizeSuccess();
           })
           .catch((error) => {
-            console.error("Error en Firebase:", error);
-            if (error && error.code === 'PERMISSION_DENIED') {
-              alert('⚠️ PERMISO DENEGADO EN FIREBASE:\n\nVe a tu Consola de Firebase -> Realtime Database -> Pestaña "Reglas" y cámbialas a:\n{\n  ".read": true,\n  ".write": true\n}');
+            console.warn("Aviso al guardar en Firebase:", error);
+            if (error && error.message === 'TIMEOUT_FIREBASE') {
+              alert('⚠️ La base de datos de Firebase no respondió a tiempo.\n\nComprueba si en la Consola de Firebase creaste la "Realtime Database" y si en la pestaña "Reglas" colocaste:\n{\n  ".read": true,\n  ".write": true\n}\n\nEl reporte se guardó de forma local.');
             }
             const localIssue = { id: Date.now().toString(), ...newIssue };
             issues.unshift(localIssue);
